@@ -1,0 +1,22 @@
+{
+  "name": "fluxo-diario",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fluxo Diário — financeiro e contábil (lançamentos, títulos a pagar/receber, balancete, DRE, inadimplência).",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "importar": "node scripts/importar-dados.js",
+    "backup": "node scripts/exportar-backup.js",
+    "teste": "node scripts/teste-api.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "compression": "^1.7.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

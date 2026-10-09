@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluxo Diário</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="/styles.css">
+<!-- Camada de dados: substitui a plataforma de artifacts do Claude (window.claude.use("db"|"assets"|"downloads"))
+     por chamadas ao backend próprio (server/). Precisa vir ANTES do app.js. -->
+<script src="/claude-shim.js"></script>
+</head>
+<body>
+<div id="capa-impressao"></div>
+
+<div class="wrap login-wrap" id="login-screen">
+  <div class="login-card" id="login-card-loading">
+    <span class="eyebrow">Fluxo Diário</span>
+    <p class="hint-block">Carregando…</p>
+  </div>
+  <div class="login-card" id="login-card-first" hidden>
+    <span class="eyebrow">Fluxo Diário</span>
+    <h1>Criar conta de administrador</h1>
+    <p class="hint-block">Ainda não há usuários cadastrados. Crie a primeira conta (administrador) para começar a usar o sistema.</p>
+    <div class="field">
+      <label for="fa-usuario">Usuário</label>
+      <input type="text" id="fa-usuario" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="fa-senha">Senha</label>
+      <div class="pw-wrap">
+        <input type="password" id="fa-senha" autocomplete="new-password">
+        <button type="button" class="pw-toggle" data-target="fa-senha" tabindex="-1">Mostrar</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="fa-senha2">Confirmar senha</label>
+      <div class="pw-wrap">
+        <input type="password" id="fa-senha2" autocomplete="new-password">
+        <button type="button" class="pw-toggle" data-target="fa-senha2" tabindex="-1">Mostrar</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="fa-email">E-mail <span class="hint">(opcional, só para referência)</span></label>
+      <input type="email" id="fa-email" autocomplete="email">
+    </div>
+    <button type="button" class="primary" id="btn-first-admin">Criar administrador e entrar</button>
+    <div id="first-admin-toast"></div>
+  </div>
+  <div class="login-card" id="login-card-keyreveal" hidden>
+    <span class="eyebrow">Fluxo Diário</span>
+    <h1>Guarde sua chave de recuperação</h1>
+    <p class="hint-block">Esta chave é a única forma de redefinir sua senha caso a esqueça, sem depender de outro administrador. Ela não será mostrada novamente — copie e guarde em local seguro.</p>
+    <div class="key-box" id="keyreveal-value"></div>
+    <button type="button" class="primary" id="btn-keyreveal-continue">Já guardei, continuar</button>
+  </div>
+  <div class="login-card" id="login-card" hidden>
+    <span class="eyebrow">Fluxo Diário</span>
+    <h1>Entrar</h1>
+    <div class="field">
+      <label for="li-usuario">Usuário</label>
+      <input type="text" id="li-usuario" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="li-senha">Senha</label>
+      <div class="pw-wrap">
+        <input type="password" id="li-senha" autocomplete="current-password">
+        <button type="button" class="pw-toggle" data-target="li-senha" tabindex="-1">Mostrar</button>
+      </div>
+    </div>
+    <button type="button" class="primary" id="btn-login">Entrar</button>
+    <div id="login-toast"></div>
+    <button type="button" class="link-btn" id="btn-forgot" style="align-self:flex-start; padding-left:0;">Esqueci minha senha</button>
+    <p class="hint-block">Peça ao administrador para cadastrar seu usuário caso ainda não tenha um.</p>
+  </div>
+  <div class="login-card" id="login-card-recover" hidden>
+    <span class="eyebrow">Fluxo Diário</span>
+    <h1>Recuperar senha</h1>
+    <p class="hint-block">Informe seu usuário e a chave de recuperação recebida ao criar a conta.</p>
+    <div class="field">
+      <label for="ri-usuario">Usuário</label>
+      <input type="text" id="ri-usuario" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="ri-chave">Chave de recuperação</label>
+      <input type="text" id="ri-chave" autocomplete="off" placeholder="XXXX-XXXX">
+    </div>
+    <div class="field">
+      <label for="ri-senha">Nova senha</label>
+      <div class="pw-wrap">
+        <input type="password" id="ri-senha" autocomplete="new-password">
+        <button type="button" class="pw-toggle" data-target="ri-senha" tabindex="-1">Mostrar</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="ri-senha2">Confirmar nova senha</label>
+      <div class="pw-wrap">
+        <input type="password" id="ri-senha2" autocomplete="new-password">
+        <button type="button" class="pw-toggle" data-target="ri-senha2" tabindex="-1">Mostrar</button>
+      </div>
+    </div>
+    <button type="button" class="primary" id="btn-recover-submit">Redefinir senha</button>
+    <button type="button" class="link-btn" id="btn-recover-cancel" style="align-self:flex-start; padding-left:0;">Voltar para o login</button>
+    <div id="recover-toast"></div>
+    <p class="hint-block">Perdeu a chave de recuperação? Peça a outro administrador para redefinir sua senha na aba Usuários.</p>
+  </div>
+</div>
+
+<div class="wrap" id="app-screen" hidden>
+  <header class="top">
+    <span class="eyebrow">Relatório financeiro diário</span>
+    <h1>Fluxo Diário</h1>
+    <p>Estrutura de pagamentos, bancos, fornecedores e empresas definida pelo administrador — a equipe só escolhe entre as opções predeterminadas e informa o valor.</p>
+    <div class="user-bar">
+      <span class="who">Logado como <strong id="who-usuario"></strong><span class="role-badge" id="who-papel"></span><span class="role-badge" id="who-area" hidden></span></span>
+      <button type="button" class="link-btn" id="btn-logout">Sair</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button type="button" data-tab="preencher" class="active" role="tab" aria-selected="true">Preencher</button>
+    <button type="button" data-tab="resumo" role="tab" aria-selected="false">Resumo</button>
+    <button type="button" data-tab="saldos" role="tab" aria-selected="false">Saldos</button>
+    <button type="button" data-tab="previsto" role="tab" aria-selected="false">A Pagar/Receber</button>
+    <button type="button" data-tab="relatorios" role="tab" aria-selected="false">Relatórios</button>
+    <button type="button" data-tab="cadastro" role="tab" aria-selected="false">Cadastro</button>
+    <button type="button" data-tab="opcoes" role="tab" aria-selected="false">Opções</button>
+    <button type="button" data-tab="fechamento" role="tab" aria-selected="false">Fechamento</button>
+    <button type="button" data-tab="usuarios" role="tab" aria-selected="false">Usuários</button>
+    <button type="button" class="split-btn" id="btn-split" aria-pressed="false" title="Mostrar o Preencher ao lado de outra aba">⇔ Dividir tela</button>
+  </nav>
+
+  <section id="tab-preencher">
+    <div class="card" id="edicao-banner" hidden style="background:var(--accent-soft); border-color:var(--accent-strong);">
+      <div class="field-row" style="align-items:center; justify-content:space-between; flex-wrap:wrap;">
+        <p style="margin:0; font-weight:600;" id="edicao-banner-texto">Editando lançamento</p>
+        <button type="button" class="link-btn" id="btn-cancelar-edicao">Cancelar edição</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="field-row">
+        <div class="field">
+          <label for="f-empresa">Empresa</label>
+          <div class="select-wrap">
+            <select id="f-empresa"></select>
+            <button type="button" class="add-btn" id="addbtn-empresa" title="Adicionar nova empresa">+</button>
+          </div>
+          <div class="add-panel" id="addpanel-empresa" hidden>
+            <input type="text" id="addinput-empresa" placeholder="Nova empresa">
+            <button type="button" class="secondary" id="addconfirm-empresa">Adicionar</button>
+            <button type="button" class="link-btn" id="addcancel-empresa">Cancelar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-data">Data</label>
+          <input type="date" id="f-data">
+          <div id="data-fechado-aviso" class="footnote" style="text-align:left; margin:2px 0 0;"></div>
+        </div>
+      </div>
+
+      <div class="import-box" id="import-planilha-box">
+        <div class="import-box-header">
+          <strong>Importar lançamentos de uma planilha (Excel)</strong>
+          <button type="button" class="link-btn" id="btn-baixar-modelo-planilha">⬇️ Baixar modelo (.xlsx)</button>
+        </div>
+        <p class="footnote" style="text-align:left; margin:4px 0 8px;">Selecione a Empresa e a Data acima, preencha o modelo (um lançamento por linha) e importe aqui. Os itens válidos entram em "Itens desta remessa" abaixo para você conferir antes de enviar — nada é salvo automaticamente. Linhas com parcelamento ou com valores que não existem nas listas cadastradas são rejeitadas e listadas no relatório de erros.</p>
+        <div class="field-row" style="align-items:center; flex-wrap:wrap;">
+          <input type="file" id="f-import-planilha" accept=".xlsx,.csv">
+          <button type="button" class="secondary" id="btn-importar-planilha">Importar planilha</button>
+        </div>
+        <div id="import-planilha-toast" style="margin:8px 0 0;"></div>
+        <div id="import-planilha-relatorio" hidden></div>
+      </div>
+
+      <div class="import-box" id="import-nfe-box">
+        <div class="import-box-header">
+          <strong>Importar NF-e ou NFS-e (XML) de compra ou venda</strong>
+        </div>
+        <p class="footnote" style="text-align:left; margin:4px 0 8px;">Selecione a Empresa acima e escolha os XMLs: vários arquivos de uma vez (Ctrl ou Shift + clique), a pasta inteira, ou o ZIP baixado da prefeitura. Pode repetir a escolha para juntar arquivos de pastas diferentes. O sistema identifica o fornecedor/cliente pelo CNPJ e monta a Compra ou Venda para você revisar. NF-e: usa as duplicatas da nota. NFS-e (prefeitura): "3x" na discriminação vira 3 parcelas a 30/60/90 dias da emissão; sem isso, vence na emissão. Notas importadas entram com a data de emissão. Nada é salvo até você enviar a remessa. O sistema lembra a conta usada para cada CFOP.</p>
+        <div class="field-row" style="align-items:center; flex-wrap:wrap;">
+          <input type="file" id="f-import-nfe" accept=".xml,text/xml,.zip,application/zip" multiple hidden>
+          <input type="file" id="f-import-nfe-pasta" webkitdirectory directory multiple hidden>
+          <button type="button" class="secondary" id="btn-nfe-arquivos">Escolher arquivos (XML ou ZIP)</button>
+          <button type="button" class="secondary" id="btn-nfe-pasta">Escolher pasta inteira</button>
+          <button type="button" class="primary" id="btn-importar-nfe">Ler XML</button>
+        </div>
+        <div id="nfe-drop" style="margin-top:8px; padding:14px; border:2px dashed var(--border, #d0d5dd); border-radius:10px; text-align:center; font-size:13px;">Ou arraste aqui os XMLs, o ZIP baixado da prefeitura ou a pasta.</div>
+        <div id="nfe-lista-arquivos" class="footnote" style="text-align:left; margin-top:6px;"></div>
+        <div id="import-nfe-toast" style="margin:8px 0 0;"></div>
+        <div id="import-nfe-revisao"></div>
+      </div>
+
+      <div class="import-box" id="import-ofx-box">
+        <div class="import-box-header"><strong>Importar extrato bancário (OFX) e boletos liquidados</strong></div>
+        <p class="footnote" style="text-align:left; margin:4px 0 8px;">Selecione a Empresa acima, o extrato OFX do banco e, se houver, o relatório de boletos liquidados (Excel do banco). O sistema monta os lançamentos do extrato: boletos viram Recebimentos com baixa do título e juros; PIX e transferências são ligados ao cliente/fornecedor pelo nome ou CNPJ; "mesma titularidade" vira Transferência; tarifa vira despesa bancária. Você confere linha a linha antes de adicionar à remessa. O sistema lembra as classificações que você fizer.</p>
+        <div class="field-row" style="align-items:flex-end; flex-wrap:wrap; gap:10px;">
+          <input type="file" id="f-ofx" accept=".ofx,.OFX" hidden>
+          <input type="file" id="f-ofx-boletos" accept=".xlsx,.xls,.csv" hidden>
+          <input type="file" id="f-ofx-docs" accept=".pdf,application/pdf,image/*" multiple hidden>
+          <button type="button" class="secondary" id="btn-ofx-arquivo">Extrato OFX</button>
+          <button type="button" class="secondary" id="btn-ofx-boletos">Boletos liquidados (Excel)</button>
+          <button type="button" class="secondary" id="btn-ofx-docs" title="PDF do relatório de títulos liquidados. Fica anexado aos lançamentos de baixa de boleto.">📎 Documento dos títulos (PDF)</button>
+          <div class="field" style="flex:0 1 170px;"><label for="ofx-banco">Banco</label><select id="ofx-banco"></select></div>
+          <div class="field" style="flex:0 1 190px;"><label for="ofx-centro">Centro de custo</label><select id="ofx-centro"></select></div>
+          <button type="button" class="primary" id="btn-ofx-ler">Ler extrato</button>
+          <button type="button" class="secondary" id="btn-ofx-limpar" title="Remove os arquivos escolhidos e a leitura da tela">Limpar</button>
+        </div>
+        <div id="ofx-arquivos" class="footnote" style="text-align:left; margin-top:6px;"></div>
+        <div id="ofx-toast" style="margin-top:8px;"></div>
+        <div id="ofx-revisao"></div>
+      </div>
+
+      <div class="add-line-grid">
+        <div class="field">
+          <label for="f-tipo">Tipo</label>
+          <select id="f-tipo"></select>
+        </div>
+        <div class="field" id="campo-despesa">
+          <label for="f-despesa">Pagamento/Recebimento</label>
+          <div class="select-wrap">
+            <select id="f-despesa"></select>
+            <button type="button" class="add-btn" id="addbtn-despesas" title="Adicionar novo pagamento/recebimento">+</button>
+          </div>
+          <div class="add-panel" id="addpanel-despesas" hidden>
+            <input type="text" id="addinput-despesas" placeholder="Novo pagamento/recebimento">
+            <button type="button" class="secondary" id="addconfirm-despesas">Adicionar</button>
+            <button type="button" class="link-btn" id="addcancel-despesas">Cancelar</button>
+          </div>
+        </div>
+        <div class="field" id="campo-direcao-devolucao" hidden>
+          <label for="f-direcao-devolucao">Direção da devolução</label>
+          <select id="f-direcao-devolucao">
+            <option value="">— selecione —</option>
+            <option value="compra">Devolução de compra (dinheiro entra)</option>
+            <option value="venda">Devolução de venda (dinheiro sai)</option>
+          </select>
+        </div>
+        <div class="field" id="campo-centro">
+          <label for="f-centro">Centro de Custo</label>
+          <div class="select-wrap">
+            <select id="f-centro"></select>
+            <button type="button" class="add-btn" id="addbtn-centrosCusto" title="Adicionar novo centro de custo">+</button>
+          </div>
+          <div class="add-panel" id="addpanel-centrosCusto" hidden>
+            <input type="text" id="addinput-centrosCusto" placeholder="Novo centro de custo">
+            <button type="button" class="secondary" id="addconfirm-centrosCusto">Adicionar</button>
+            <button type="button" class="link-btn" id="addcancel-centrosCusto">Cancelar</button>
+          </div>
+        </div>
+        <div class="field" id="campo-historico">
+          <label for="f-historico">Histórico</label>
+          <input type="text" id="f-historico" list="f-historico-list" autocomplete="off" placeholder="Digite o histórico/observação...">
+          <datalist id="f-historico-list"></datalist>
+        </div>
+        <div class="field" id="campo-fornecedor">
+          <label for="f-fornecedor-busca" id="f-fornecedor-label">Fornecedor / Cliente</label>
+          <div class="select-wrap combo-wrap">
+            <input type="text" id="f-fornecedor-busca" autocomplete="off" placeholder="Buscar por nome ou CPF/CNPJ...">
+            <button type="button" class="add-btn" id="addbtn-fornecedores" title="Adicionar novo fornecedor/cliente">+</button>
+            <select id="f-fornecedor" style="display:none"></select>
+            <div class="combo-dropdown" id="f-fornecedor-dropdown" hidden></div>
+          </div>
+          <div class="part-status" id="f-part-status" hidden></div>
+          <div class="add-panel" id="addpanel-fornecedores" hidden>
+            <input type="text" id="addinput-fornecedores" placeholder="Novo fornecedor/cliente">
+            <button type="button" class="secondary" id="addconfirm-fornecedores">Adicionar</button>
+            <button type="button" class="link-btn" id="addcancel-fornecedores">Cancelar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-valor">Valor</label>
+          <input type="number" id="f-valor" min="0" step="0.01" placeholder="0,00">
+        </div>
+        <div class="field" id="campo-condicao" hidden>
+          <label for="f-condicao">Condição</label>
+          <select id="f-condicao">
+            <option value="prazo">A prazo (gera contas a pagar/receber)</option>
+            <option value="vista">À vista (vence hoje, paga/recebe depois)</option>
+          </select>
+        </div>
+        <div class="field" id="campo-banco">
+          <label for="f-banco">Banco</label>
+          <div class="select-wrap">
+            <select id="f-banco"></select>
+            <button type="button" class="add-btn" id="addbtn-bancos" title="Adicionar novo banco">+</button>
+          </div>
+          <div class="add-panel" id="addpanel-bancos" hidden>
+            <input type="text" id="addinput-bancos" placeholder="Novo banco">
+            <button type="button" class="secondary" id="addconfirm-bancos">Adicionar</button>
+            <button type="button" class="link-btn" id="addcancel-bancos">Cancelar</button>
+          </div>
+        </div>
+        <div class="field" id="campo-banco-origem" hidden>
+          <label for="f-banco-origem">Banco de Origem</label>
+          <select id="f-banco-origem"></select>
+        </div>
+        <div class="field" id="campo-banco-destino" hidden>
+          <label for="f-banco-destino">Banco de Destino</label>
+          <select id="f-banco-destino"></select>
+        </div>
+        <div class="field" id="campo-forma">
+          <label for="f-forma">Forma de Pagamento</label>
+          <div class="select-wrap">
+            <select id="f-forma"></select>
+            <button type="button" class="add-btn" id="addbtn-formasPagamento" title="Adicionar nova forma de pagamento">+</button>
+          </div>
+          <div class="add-panel" id="addpanel-formasPagamento" hidden>
+            <input type="text" id="addinput-formasPagamento" placeholder="Nova forma de pagamento">
+            <button type="button" class="secondary" id="addconfirm-formasPagamento">Adicionar</button>
+            <button type="button" class="link-btn" id="addcancel-formasPagamento">Cancelar</button>
+          </div>
+        </div>
+        <div class="field" id="campo-conta-debito">
+          <label for="f-conta-debito">Conta Débito</label>
+          <select id="f-conta-debito"></select>
+          <div class="hint" id="f-conta-debito-info"></div>
+        </div>
+        <div class="field" id="campo-conta-credito">
+          <label for="f-conta-credito">Conta Crédito</label>
+          <select id="f-conta-credito"></select>
+          <div class="hint" id="f-conta-credito-info"></div>
+        </div>
+        <div class="field" id="campo-comprovante">
+          <label for="f-comprovante">Comprovante <span class="hint">(opcional)</span></label>
+          <input type="file" id="f-comprovante" accept="image/*,application/pdf" multiple>
+        </div>
+        <div class="field" id="parcelas-wrap" hidden>
+          <label for="f-num-parcelas">Parcelas</label>
+          <input type="number" id="f-num-parcelas" min="1" max="60" value="2">
+        </div>
+      </div>
+      <div class="parcelas-datas" id="parcelas-datas" hidden></div>
+      <div class="titulos-box" id="campo-titulos" hidden>
+        <strong>Contas em aberto deste fornecedor/cliente</strong>
+        <div id="titulos-lista"></div>
+        <div id="titulos-extras" hidden>
+          <div class="field-row" style="flex-wrap:wrap;">
+            <div class="field"><label for="f-juros">Juros / multa</label><input type="number" id="f-juros" min="0" step="0.01" placeholder="0,00"></div>
+            <div class="field"><label for="f-desconto">Desconto</label><input type="number" id="f-desconto" min="0" step="0.01" placeholder="0,00"></div>
+          </div>
+          <p class="footnote" id="titulos-resumo" style="text-align:left; margin:4px 0 0;"></p>
+        </div>
+      </div>
+
+      <div class="field" id="campo-dividir-toggle" style="flex:none; margin:2px 0 14px;">
+        <label style="text-transform:none; font-weight:600; font-size:13.5px; flex-direction:row; align-items:center; display:flex; gap:8px;">
+          <input type="checkbox" id="f-dividir-toggle"> Dividir entre mais de um centro de custo / forma de pagamento / banco
+        </label>
+      </div>
+      <div id="rateio-wrap" hidden>
+        <div id="rateio-linhas"></div>
+        <div class="add-actions" style="justify-content:flex-start; margin-top:4px;">
+          <button type="button" class="link-btn" id="btn-rateio-add">+ Adicionar divisão</button>
+        </div>
+        <p class="footnote" id="rateio-total" style="text-align:left; margin:8px 0 0; font-weight:700;">Total do rateio: R$ 0,00</p>
+      </div>
+
+      <div class="field" id="campo-repetir" style="flex:none; margin:2px 0 14px;">
+        <label style="text-transform:none; font-weight:600; font-size:13.5px; flex-direction:row; align-items:center; display:flex; gap:8px;">
+          <input type="checkbox" id="f-repetir"> Repetir este lançamento (lançamentos múltiplos / provisão recorrente)
+        </label>
+        <div id="repetir-opcoes" hidden style="margin-top:8px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2);">
+          <div class="field-row" style="flex-wrap:wrap; gap:12px;">
+            <div class="field" style="flex:0 0 260px;">
+              <label for="f-repetir-modo">Até quando</label>
+              <select id="f-repetir-modo">
+                <option value="qtd">Número de vezes definido</option>
+                <option value="sempre">Sem fim — repete até eu encerrar</option>
+              </select>
+            </div>
+            <div class="field" style="flex:0 0 150px;" id="campo-repetir-qtd">
+              <label for="f-repetir-qtd">Quantidade de vezes</label>
+              <input type="number" id="f-repetir-qtd" min="2" max="120" value="12">
+            </div>
+            <div class="field" style="flex:0 0 200px;">
+              <label for="f-repetir-periodo">Repetir a cada</label>
+              <select id="f-repetir-periodo">
+                <option value="m1">Mês (mensal)</option>
+                <option value="d15">15 dias (quinzenal)</option>
+                <option value="d7">7 dias (semanal)</option>
+                <option value="m2">2 meses (bimestral)</option>
+                <option value="m3">3 meses (trimestral)</option>
+                <option value="m6">6 meses (semestral)</option>
+                <option value="m12">12 meses (anual)</option>
+                <option value="dias">Outro: N dias</option>
+              </select>
+            </div>
+            <div class="field" style="flex:0 0 120px;" id="campo-repetir-dias" hidden>
+              <label for="f-repetir-dias">Nº de dias</label>
+              <input type="number" id="f-repetir-dias" min="1" max="365" value="30">
+            </div>
+            <div class="field" style="flex:0 0 200px;">
+              <label style="text-transform:none; font-weight:500; font-size:13px; flex-direction:row; align-items:center; display:flex; gap:6px; margin-top:22px;">
+                <input type="checkbox" id="f-repetir-diautil" checked> Vencimento sempre em dia útil
+              </label>
+            </div>
+          </div>
+          <p class="footnote" id="repetir-previa" style="text-align:left; margin:6px 0 0;"></p>
+        </div>
+      </div>
+
+      <div class="field" id="campo-fixar-campos" style="flex:none; margin:2px 0 4px;">
+        <label style="text-transform:none; font-weight:600; font-size:12.5px; color:var(--text-muted); margin-bottom:6px; display:block;">📌 Fixar campos para o próximo lançamento (não limpa depois de "+ Adicionar")</label>
+        <div class="check-list" style="flex-direction:row; flex-wrap:wrap; gap:4px 16px; max-height:none; border:none; padding:0; background:transparent;">
+          <label><input type="checkbox" id="fixar-tipo"> Tipo</label>
+          <label><input type="checkbox" id="fixar-despesa"> Pagamento/Recebimento</label>
+          <label><input type="checkbox" id="fixar-centro"> Centro de Custo</label>
+          <label><input type="checkbox" id="fixar-banco"> Banco</label>
+          <label><input type="checkbox" id="fixar-forma"> Forma de Pagamento</label>
+          <label><input type="checkbox" id="fixar-historico"> Histórico</label>
+          <label><input type="checkbox" id="fixar-fornecedor"> Fornecedor/Cliente</label>
+        </div>
+      </div>
+
+      <div class="add-actions">
+        <button type="button" class="secondary" id="btn-add">+ Adicionar</button>
+      </div>
+
+      <div class="pending">
+        <h3 id="pending-title">Itens desta remessa</h3>
+        <div class="table-scroll">
+          <table id="tbl-pending">
+            <thead><tr><th>Tipo</th><th>Pagamento/Recebimento</th><th>Centro de Custo</th><th>Fornecedor/Cliente</th><th>Banco</th><th>Forma Pgto.</th><th class="num">Valor</th><th>Parcelas</th><th>Débito</th><th>Crédito</th><th>Anexo</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="footnote" id="pending-resumo-envio" style="text-align:left; font-weight:700; margin:10px 0 0;" hidden></p>
+      <div id="conf-remessa-wrap" hidden style="margin-top:14px; padding:12px 14px; border:1px solid var(--border, #d0d5dd); border-radius:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <strong>Conferência da remessa (antes de enviar)</strong>
+          <span>
+            <button type="button" class="secondary" id="btn-conf-baixar">⬇️ Baixar para imprimir</button>
+            <button type="button" class="link-btn" id="btn-conf-fechar">Fechar</button>
+          </span>
+        </div>
+        <div id="conf-remessa"></div>
+        <div id="conf-toast" style="margin-top:8px;"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" id="btn-conferir">Conferir remessa</button>
+        <button type="button" class="primary" id="btn-submit">Enviar lançamentos</button>
+      </div>
+      <div id="form-toast" style="margin-top:12px;"></div>
+    </div>
+    <div class="card" id="card-recorrencias" style="margin-top:16px;">
+      <div class="section-title"><h2>Lançamentos recorrentes <span id="rec-contagem" style="font-weight:500; color:var(--text-muted); font-size:14px;"></span></h2></div>
+      <p class="footnote" style="margin:0 0 10px; text-align:left;">Despesas que se repetem sem data para terminar (ex.: aluguel, honorários, internet). Cada período o sistema cria sozinho o lançamento do mês, com uma única parcela/título, quando alguém abre o sistema a partir daquele mês. Para criar, marque "Repetir este lançamento" &gt; "Sem fim" no formulário acima. Alterar o valor vale para os próximos meses; os já gerados não mudam.</p>
+      <div style="overflow-x:auto;">
+        <table class="tbl" id="tbl-recorrencias" style="width:100%; font-size:13px;">
+          <thead><tr><th>Empresa</th><th>Tipo</th><th>Fornecedor/Cliente</th><th>Histórico</th><th class="num">Valor</th><th>A cada</th><th>Próximo</th><th>Gerados</th><th>Situação</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="rec-toast" style="margin-top:10px;"></div>
+    </div>
+    <p class="footnote">Todas as listas (tipo, pagamento/recebimento, centro de custo, histórico, fornecedor/cliente, banco, forma de pagamento, empresa) são fixas — definidas pelo administrador, que também pode bloquear opções específicas na aba Opções.</p>
+  </section>
+
+  <section id="tab-resumo" hidden>
+    <div class="card">
+      <div class="field-row" style="margin-bottom:8px;">
+        <div class="field" style="max-width:300px;">
+          <label>Filtrar por empresa <span class="hint">(Todos ou escolha as que quiser)</span></label>
+          <div class="ms-select" id="r-empresa-ms">
+            <button type="button" class="ms-select-btn" id="r-empresa-btn"></button>
+            <div class="ms-select-panel" id="r-empresa-panel" hidden>
+              <label class="ms-option ms-option-todos"><input type="checkbox" id="r-empresa-cb-todos"><span>Todos</span></label>
+              <div class="ms-option-sep"></div>
+              <div id="r-empresa-opts"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-row" id="stat-row"></div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Total por empresa</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-empresas">
+          <thead><tr><th>Empresa</th><th class="num">Pagamentos</th><th class="num">Recebimentos</th><th class="num">Saldo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2 class="group-title expense">Pagamentos — empresa selecionada</h2>
+
+    <div class="card">
+      <div class="section-title"><h2>Por centro de custo</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-centros-desp"><thead><tr><th>Centro de Custo</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Por pagamento</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-itens-desp"><thead><tr><th>Pagamento</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Por banco</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-bancos-desp"><thead><tr><th>Banco</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Por forma de pagamento</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-formas-desp"><thead><tr><th>Forma de Pagamento</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Maiores fornecedores</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-fornecedores-desp"><thead><tr><th>Fornecedor</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="more-note" id="fornecedores-desp-more" hidden></div>
+    </div>
+
+    <h2 class="group-title receita">Recebimentos — empresa selecionada</h2>
+
+    <div class="card">
+      <div class="section-title"><h2>Por centro de custo</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-centros-rec"><thead><tr><th>Centro de Custo</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Por recebimento</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-itens-rec"><thead><tr><th>Recebimento</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Por banco</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-bancos-rec"><thead><tr><th>Banco</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Por forma de pagamento</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-formas-rec"><thead><tr><th>Forma de Pagamento</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Maiores fontes (fornecedor/cliente)</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-fornecedores-rec"><thead><tr><th>Fornecedor</th><th class="num">Total</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="more-note" id="fornecedores-rec-more" hidden></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2 id="log-titulo">Lançamentos recentes</h2></div>
+      <div class="field-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:200px;">
+          <label for="f-log-data-filtro">Buscar lançamentos por data</label>
+          <input type="date" id="f-log-data-filtro">
+        </div>
+        <div class="field" style="max-width:240px;">
+          <label>Banco <span class="hint">(escolha 1 só p/ conferir saldo)</span></label>
+          <div class="ms-select" id="r-banco-ms">
+            <button type="button" class="ms-select-btn" id="r-banco-btn"></button>
+            <div class="ms-select-panel" id="r-banco-panel" hidden>
+              <label class="ms-option ms-option-todos"><input type="checkbox" id="r-banco-cb-todos"><span>Todos</span></label>
+              <div class="ms-option-sep"></div>
+              <div id="r-banco-opts"></div>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="link-btn" id="btn-log-data-limpar" style="margin-bottom:9px;">Ver os 25 mais recentes</button>
+        <button type="button" class="secondary" id="btn-baixar-capa" style="margin-bottom:9px;">⬇️ Baixar capa (HTML)</button>
+        <button type="button" class="link-btn" id="btn-imprimir-capa" style="margin-bottom:9px;">🖨️ Tentar imprimir direto</button>
+      </div>
+      <div id="resumo-toast" style="margin:2px 0 8px;"></div>
+      <p class="footnote" id="log-saldo-anterior" style="text-align:left; margin:2px 0 10px; font-weight:700;" hidden></p>
+      <p class="footnote" style="text-align:left; margin:-4px 0 10px;">Para gerar a capa: selecione exatamente uma empresa e um banco (acima, no Resumo) e a data em "Buscar lançamentos por data". "Baixar capa" funciona sempre — abra o arquivo baixado e use Ctrl+P (ou Cmd+P) para imprimir ou salvar como PDF. "Tentar imprimir direto" pode não funcionar em alguns navegadores. Marque as caixinhas da tabela abaixo para corrigir Empresa e/ou Data de vários lançamentos de uma vez.</p>
+      <div class="import-box" id="log-mover-lote-toolbar" hidden>
+        <div class="import-box-header">
+          <strong id="log-mover-lote-contagem">0 selecionado(s)</strong>
+          <button type="button" class="link-btn" id="btn-mover-lote-cancelar">Cancelar seleção</button>
+        </div>
+        <p class="footnote" style="text-align:left; margin:4px 0 8px;">Escolha a nova Empresa e/ou a nova Data (deixe em branco o que não quiser alterar) e aplique aos lançamentos marcados na tabela — ou exclua os marcados no botão abaixo.</p>
+        <div class="field-row" style="align-items:center; flex-wrap:wrap;">
+          <div class="field" style="max-width:220px;">
+            <label for="log-mover-empresa">Nova Empresa</label>
+            <select id="log-mover-empresa"><option value="">— manter —</option></select>
+          </div>
+          <div class="field" style="max-width:200px;">
+            <label for="log-mover-data">Nova Data</label>
+            <input type="date" id="log-mover-data">
+          </div>
+          <button type="button" class="secondary" id="btn-mover-lote" style="margin-bottom:9px;">Mover selecionados</button>
+        </div>
+        <div id="log-mover-lote-toast" style="margin:6px 0 0;"></div>
+      </div>
+      <div class="table-scroll">
+        <table id="tbl-log"><thead><tr><th><input type="checkbox" id="log-select-all" title="Selecionar todos os visíveis"></th><th></th><th>Data</th><th>Empresa</th><th>Tipo</th><th>Pagamento/Recebimento</th><th>Centro de Custo</th><th>Fornecedor/Cliente</th><th>Banco</th><th>Forma Pgto.</th><th class="num">Valor</th><th class="num">Saldo</th><th>Status</th><th>Anexo</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-saldos" hidden>
+    <div class="card" id="saldos-edit-card">
+      <div class="section-title"><h2>Definir saldo inicial</h2></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="s-empresa">Empresa</label>
+          <select id="s-empresa"></select>
+        </div>
+        <div class="field">
+          <label for="s-banco">Banco</label>
+          <select id="s-banco"></select>
+        </div>
+        <div class="field">
+          <label for="s-saldo">Saldo inicial</label>
+          <input type="number" id="s-saldo" step="0.01" placeholder="0,00">
+        </div>
+        <div class="field">
+          <label for="s-saldo-data">Data do saldo inicial</label>
+          <input type="date" id="s-saldo-data">
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-start;">
+        <button type="button" class="secondary" id="btn-saldo-save">Salvar saldo inicial</button>
+      </div>
+      <div id="saldo-toast" style="margin-top:12px;"></div>
+      <p class="footnote" style="margin-top:12px;">O saldo inicial é o ponto de partida de cada conta (empresa + banco). A data registra a partir de quando os lançamentos desta conta começaram a ser feitos no sistema. A partir daí, cada lançamento (pagamento ou recebimento) atualiza o saldo automaticamente.</p>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Saldo atual por conta</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-saldos">
+          <thead><tr><th>Empresa</th><th>Banco</th><th>Data inicial</th><th class="num">Saldo inicial</th><th class="num">Movimentado</th><th class="num">Saldo atual</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Saldos de clientes e fornecedores</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Valores a pagar e a receber já existentes antes deste sistema, cadastrados na aba Cadastro, junto com o CPF/CNPJ de cada cliente/fornecedor.</p>
+      <div class="totals-line" id="saldos-clientes-totais"></div>
+      <div class="table-scroll">
+        <table id="tbl-saldos-clientes">
+          <thead><tr><th>Cliente / Fornecedor</th><th>Documento</th><th>Empresa</th><th>Tipo</th><th>Nº doc.</th><th class="num">Valor</th><th class="num">Saldo</th><th>Vencimento</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-previsto" hidden>
+    <div class="card">
+      <div class="section-title"><h2>Contas a pagar e a receber</h2></div>
+      <p class="footnote" style="text-align:left; margin:0 0 10px;">Parcelas em aberto das Compras e Vendas, por vencimento. Elas entram no fluxo realizado só quando o Pagamento ou Recebimento é lançado, total ou parcial.</p>
+      <div class="field-row" style="flex-wrap:wrap;">
+        <div class="field"><label for="prev-empresa">Empresa</label><select id="prev-empresa"><option value="">Todas as empresas</option></select></div>
+        <div class="field"><label for="prev-natureza">Mostrar</label><select id="prev-natureza"><option value="">A pagar e a receber</option><option value="pagar">Só a pagar</option><option value="receber">Só a receber</option></select></div>
+      </div>
+      <p id="prev-totais" style="font-weight:600; margin:6px 0 10px;"></p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Vencimento</th><th>Tipo</th><th>Empresa</th><th>Cliente / Fornecedor</th><th>Histórico</th><th>Parcela</th><th class="num">Valor</th><th class="num">Pago</th><th class="num">Saldo</th><th>Situação</th></tr></thead>
+          <tbody id="prev-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title"><h2>Fluxo de caixa projetado</h2></div>
+      <p class="footnote" style="text-align:left; margin:0 0 10px;">Saldo atual dos bancos, somando os recebimentos e subtraindo os pagamentos previstos em cada data. Contas vencidas e não pagas entram na linha de hoje.</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Data</th><th class="num">Entradas previstas</th><th class="num">Saídas previstas</th><th class="num">Saldo projetado</th></tr></thead>
+          <tbody id="proj-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-relatorios" hidden>
+    <div class="card">
+      <div class="section-title"><h2>Relatórios</h2></div>
+      <div class="rel-sub" id="rel-sub">
+        <button type="button" data-rel="razao" class="active">Razão do parceiro</button>
+        <button type="button" data-rel="posicao">Posição por vencimento</button>
+        <button type="button" data-rel="balancete">Balancete</button>
+        <button type="button" data-rel="balanco">Balanço e DRE</button>
+        <button type="button" data-rel="graficos">Gráficos</button>
+        <button type="button" data-rel="inadimplencia">Inadimplência</button>
+      </div>
+
+      <div id="rel-inadimplencia" class="viz-root" hidden>
+        <p class="footnote" style="text-align:left; margin:0 0 10px;">Classificação dos devedores pelos títulos em aberto hoje (lançamentos e saldos iniciais). A faixa de atraso é a do título vencido mais antigo de cada um. Clique no nome para abrir o razão.</p>
+        <div class="rel-filtros">
+          <div class="field"><label for="in-nat">Mostrar</label><select id="in-nat"><option value="receber">Clientes (a receber)</option><option value="pagar">Fornecedores (a pagar)</option></select></div>
+          <div class="field"><label for="in-empresa">Empresa</label><select id="in-empresa"></select></div>
+          <div class="field"><label for="in-ordem">Classificar por</label><select id="in-ordem">
+            <option value="dias">Mais tempo em atraso</option><option value="vencido">Maior valor vencido</option><option value="aberto">Maior total em aberto</option><option value="qtd">Mais títulos vencidos</option><option value="nome">Nome (A–Z)</option></select></div>
+          <div class="field"><label for="in-faixa">Faixa de atraso</label><select id="in-faixa"><option value="">Todas</option></select></div>
+          <div class="field"><label for="in-cobr">Cobrança</label><select id="in-cobr"><option value="">Todos</option><option value="protestado">Com protesto</option><option value="cobrado">Cobrados</option><option value="sem">Sem cobrança registrada</option></select></div>
+          <div class="field" style="flex-basis:200px;"><label for="in-busca">Nome</label><input type="text" id="in-busca" placeholder="Todos (ou parte do nome)"></div>
+          <label class="opt-check" style="margin:0 0 8px;"><input type="checkbox" id="in-so-venc" checked> Só quem tem vencido</label>
+          <button type="button" class="secondary" id="in-xlsx">Baixar Excel</button>
+        </div>
+        <div id="in-msg"></div>
+        <div class="viz-kpis" id="in-kpis"></div>
+        <div class="viz-card" id="in-aging" style="margin-bottom:14px;"></div>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>#</th><th>Parceiro</th><th>Faixa</th><th class="num">Maior atraso</th><th>Vencido desde</th><th class="num">Títulos vencidos</th><th class="num">Vencido</th><th class="num">A vencer</th><th class="num">Total em aberto</th><th>Cobrança</th><th class="num">Limite</th></tr></thead><tbody id="in-body"></tbody></table></div>
+      </div>
+
+      <div id="rel-graficos" class="viz-root" hidden>
+        <p class="footnote" style="text-align:left; margin:0 0 10px;">Vendas e serviços pelas notas lançadas (Vendas por competência; serviço = item com "SERVIÇO" no nome). Recebimentos pelo que entrou no banco no período. Maiores devedores pelos títulos em aberto hoje, incluindo os saldos iniciais. Passe o mouse sobre as barras para ver os valores.</p>
+        <div class="rel-filtros">
+          <div class="field"><label for="gr-de">De</label><input type="date" id="gr-de"></div>
+          <div class="field"><label for="gr-ate">Até</label><input type="date" id="gr-ate"></div>
+          <div class="field"><label for="gr-empresa">Empresa</label><select id="gr-empresa"></select></div>
+          <div class="field"><label for="gr-periodo">Atalho</label><select id="gr-periodo"><option value="">—</option><option value="mes">Este mês</option><option value="mesant">Mês passado</option><option value="30">Últimos 30 dias</option><option value="ano">Este ano</option></select></div>
+          <button type="button" class="secondary" id="gr-xlsx">Baixar Excel</button>
+        </div>
+        <div id="gr-msg"></div>
+        <div class="viz-kpis" id="gr-kpis"></div>
+        <div class="viz-grid">
+          <div class="viz-card" id="gr-vendas"></div>
+          <div class="viz-card" id="gr-servicos"></div>
+          <div class="viz-card" id="gr-top-compras"></div>
+          <div class="viz-card" id="gr-top-pagos"></div>
+          <div class="viz-card" id="gr-devedores"></div>
+          <div class="viz-card" id="gr-formas"></div>
+        </div>
+      </div>
+
+      <div id="rel-razao">
+        <p class="footnote" style="text-align:left; margin:0 0 10px;">Todas as partidas na conta do cliente ou fornecedor, com saldo corrido. O saldo inicial do cadastro entra como saldo anterior. Abaixo, os títulos em aberto que formam o saldo.</p>
+        <div class="rel-filtros">
+          <div class="field"><label for="rz-cat">Parceiro</label><select id="rz-cat"><option value="fornecedores">Fornecedor</option><option value="clientes">Cliente</option></select></div>
+          <div class="field" style="flex-basis:280px;"><label for="rz-nome">Nome ou CPF/CNPJ</label><input type="text" id="rz-nome" list="rz-nome-list" autocomplete="off" placeholder="Digite para buscar..."><datalist id="rz-nome-list"></datalist></div>
+          <div class="field"><label for="rz-empresa">Empresa</label><select id="rz-empresa"></select></div>
+          <div class="field"><label for="rz-de">De</label><input type="date" id="rz-de"></div>
+          <div class="field"><label for="rz-ate">Até</label><input type="date" id="rz-ate"></div>
+          <button type="button" class="secondary" id="rz-gerar">Gerar</button>
+          <button type="button" class="secondary" id="rz-xlsx">Baixar Excel</button>
+        </div>
+        <div id="rz-msg"></div>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>Data</th><th>Tipo</th><th>Empresa</th><th>Histórico</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo</th></tr></thead><tbody id="rz-body"></tbody></table></div>
+        <h3 style="margin:18px 0 6px; font-size:15px;">Títulos em aberto</h3>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>Vencimento</th><th>Empresa</th><th>Histórico</th><th>Parcela</th><th class="num">Valor</th><th class="num">Pago</th><th class="num">Saldo</th><th>Situação</th><th class="num">Atraso</th><th>Cobrança</th></tr></thead><tbody id="rz-tit"></tbody></table></div>
+      </div>
+
+      <div id="rel-posicao" hidden>
+        <p class="footnote" style="text-align:left; margin:0 0 10px;">Quanto se deve (ou se tem a receber) até uma data: soma o saldo das parcelas com vencimento até a data escolhida. Vencidas e não pagas sempre entram. Em "Posição em", o saldo considera só os pagamentos/recebimentos lançados até aquele dia.</p>
+        <div class="rel-filtros">
+          <div class="field"><label for="ps-nat">Mostrar</label><select id="ps-nat"><option value="pagar">A pagar</option><option value="receber">A receber</option><option value="">A pagar e a receber</option></select></div>
+          <div class="field"><label for="ps-ate">Vencimento até</label><input type="date" id="ps-ate"></div>
+          <div class="field"><label for="ps-pos">Posição em</label><input type="date" id="ps-pos"></div>
+          <div class="field"><label for="ps-empresa">Empresa</label><select id="ps-empresa"></select></div>
+          <div class="field" style="flex-basis:240px;"><label for="ps-parc">Fornecedor / Cliente</label><input type="text" id="ps-parc" placeholder="Todos (ou parte do nome)"></div>
+          <label class="opt-check" style="margin:0 0 8px;"><input type="checkbox" id="ps-agrupar" checked> Agrupar por parceiro</label>
+          <button type="button" class="secondary" id="ps-xlsx">Baixar Excel</button>
+        </div>
+        <p class="rel-tot" id="ps-tot"></p>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>Parceiro</th><th>Tipo</th><th>Empresa</th><th>Histórico</th><th>Parcela</th><th>Vencimento</th><th class="num">Saldo</th><th>Situação</th></tr></thead><tbody id="ps-body"></tbody></table></div>
+      </div>
+
+      <div id="rel-balancete" hidden>
+        <p class="footnote" style="text-align:left; margin:0 0 10px;">Soma das partidas (Conta Débito / Conta Crédito) de cada lançamento, por conta do plano. Saldo anterior = tudo antes do início do período. Os saldos iniciais de bancos e de clientes/fornecedores entram contra a conta "Ajustes de saldos iniciais" (patrimônio líquido).</p>
+        <div class="rel-filtros">
+          <div class="field"><label for="bc-de">De</label><input type="date" id="bc-de"></div>
+          <div class="field"><label for="bc-ate">Até</label><input type="date" id="bc-ate"></div>
+          <div class="field"><label for="bc-empresa">Empresa</label><select id="bc-empresa"></select></div>
+          <div class="field"><label for="bc-nivel">Nível</label><select id="bc-nivel"><option value="99">Até as analíticas</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+          <label class="opt-check" style="margin:0 0 8px;"><input type="checkbox" id="bc-ocultar" checked> Ocultar contas zeradas</label>
+          <button type="button" class="secondary" id="bc-xlsx">Baixar Excel</button>
+        </div>
+        <div id="bc-msg"></div>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>Conta</th><th class="num">Saldo anterior</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo atual</th></tr></thead><tbody id="bc-body"></tbody></table></div>
+      </div>
+
+      <div id="rel-balanco" hidden>
+        <p class="footnote" style="text-align:left; margin:0 0 10px;">Balanço patrimonial na data escolhida (saldos acumulados) e DRE do período. O resultado do período entra no patrimônio líquido até o encerramento do exercício.</p>
+        <div class="rel-filtros">
+          <div class="field"><label for="bl-de">DRE de</label><input type="date" id="bl-de"></div>
+          <div class="field"><label for="bl-ate">Balanço em / DRE até</label><input type="date" id="bl-ate"></div>
+          <div class="field"><label for="bl-empresa">Empresa</label><select id="bl-empresa"></select></div>
+          <div class="field"><label for="bl-nivel">Detalhe</label><select id="bl-nivel"><option value="2">Grupos</option><option value="3" selected>Subgrupos</option><option value="99">Até as analíticas</option></select></div>
+          <button type="button" class="secondary" id="bl-xlsx">Baixar Excel</button>
+        </div>
+        <div id="bl-msg"></div>
+        <h3 style="margin:10px 0 6px; font-size:15px;">Balanço patrimonial</h3>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>Conta</th><th class="num">Saldo</th></tr></thead><tbody id="bl-body"></tbody></table></div>
+        <h3 style="margin:18px 0 6px; font-size:15px;">Demonstração do resultado (DRE)</h3>
+        <div class="table-scroll"><table class="rel-tab"><thead><tr><th>Conta</th><th class="num">Valor</th></tr></thead><tbody id="dre-body"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-cadastro" hidden>
+    <div class="card">
+      <div class="section-title"><h2>Cadastro de Empresas</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Dados cadastrais, quadro societário e documentos de cada empresa do grupo. Clique numa empresa para abrir o cadastro completo.</p>
+      <div id="cadastro-empresas-lista"></div>
+      <datalist id="regimes-tributarios-datalist"></datalist>
+    </div>
+    <div class="card">
+      <div class="section-title"><h2>Importar cartão CNPJ (PDF da Receita)</h2></div>
+      <p class="footnote" style="margin:0 0 10px; text-align:left;">Escolha um ou mais PDFs do "Comprovante de Inscrição e de Situação Cadastral" baixados do site da Receita. O sistema lê CNPJ, razão social, nome fantasia, endereço, município, e-mail, telefone e situação cadastral. CNPJ novo vira um cadastro; CNPJ já cadastrado mostra o que mudou para você confirmar. Cada filial tem o seu cadastro. A inscrição estadual não vem nesse PDF.</p>
+      <div class="field-row" style="align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div class="field" style="flex:0 1 200px;"><label for="cnpj-pdf-cat">Cadastrar como</label><select id="cnpj-pdf-cat"><option value="clientes">Cliente</option><option value="fornecedores">Fornecedor</option></select></div>
+        <input type="file" id="cnpj-pdf-input" accept=".pdf,application/pdf" multiple hidden>
+        <button type="button" class="secondary" id="btn-cnpj-pdf-escolher">Escolher PDFs</button>
+        <button type="button" class="primary" id="btn-cnpj-pdf-ler">Ler PDFs</button>
+      </div>
+      <div id="cnpj-pdf-lista" class="footnote" style="text-align:left; margin-top:6px;"></div>
+      <div id="cnpj-pdf-toast" style="margin-top:8px;"></div>
+      <div id="cnpj-pdf-revisao"></div>
+    </div>
+    <div class="card">
+      <div class="section-title"><h2>Cadastro de Fornecedores</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Dados cadastrais completos de cada fornecedor, compartilhados entre todas as empresas do grupo. Clique num fornecedor para abrir o cadastro completo. Novos fornecedores são adicionados na aba Preencher (lançamento de Pagamento/Compra) ou na aba Opções.</p>
+      <input type="text" id="cadastro-fornecedores-busca" placeholder="Buscar fornecedor por nome ou CPF/CNPJ..." style="width:100%; margin-bottom:12px;">
+      <div id="cadastro-fornecedores-lista"></div>
+    </div>
+    <div class="card">
+      <div class="section-title"><h2>Cadastro de Clientes</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Dados cadastrais completos de cada cliente, compartilhados entre todas as empresas do grupo. Clique num cliente para abrir o cadastro completo. Novos clientes são adicionados na aba Preencher (lançamento de Recebimento/Venda) ou na aba Opções.</p>
+      <input type="text" id="cadastro-clientes-busca" placeholder="Buscar cliente por nome ou CPF/CNPJ..." style="width:100%; margin-bottom:12px;">
+      <div id="cadastro-clientes-lista"></div>
+    </div>
+  </section>
+
+  <section id="tab-opcoes" hidden>
+    <div class="card">
+      <div class="section-title"><h2>Opções disponíveis para lançamento</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Desmarque uma opção para bloqueá-la nos formulários de lançamento (Preencher e Saldos). Lançamentos e relatórios já existentes não são afetados.</p>
+      <div id="opcoes-groups"></div>
+      <div class="actions" style="justify-content:flex-start; margin-top:16px;">
+        <button type="button" class="primary" id="btn-opcoes-save">Salvar opções</button>
+      </div>
+      <div id="opcoes-toast" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Feriados para vencimentos</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Vencimento que cai em sábado, domingo ou feriado passa para o próximo dia útil. Os feriados nacionais (inclusive Carnaval, Sexta-feira Santa e Corpus Christi) já são considerados. Cadastre aqui os feriados municipais, um por linha: <b>dd/mm</b> para todo ano ou <b>dd/mm/aaaa</b> para uma data só.</p>
+      <textarea id="opcoes-feriados" rows="5" style="width:100%; max-width:360px; font:inherit;" placeholder="28/07&#10;08/12"></textarea>
+      <div class="actions" style="justify-content:flex-start; margin-top:12px;">
+        <button type="button" class="primary" id="btn-feriados-save">Salvar feriados</button>
+      </div>
+      <div id="feriados-toast" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Bloqueios por área</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Cada usuário tem uma ou mais áreas (Financeiro, Faturamento, Estoque, Contabilidade). Aqui você escolhe, para cada área, quais opções de Tipo de lançamento, Centro de Custo e Banco ficam disponíveis nos formulários. Quando um usuário marca mais de uma área, ele vê a soma (união) do que cada área libera. Administradores e supervisores sempre veem todas as opções, independente da área.</p>
+      <div id="opcoes-area-groups"></div>
+      <div class="actions" style="justify-content:flex-start; margin-top:16px;">
+        <button type="button" class="primary" id="btn-opcoes-area-save">Salvar bloqueios por área</button>
+      </div>
+      <div id="opcoes-area-toast" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Plano de Contas</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Contas contábeis organizadas em hierarquia (grupo &gt; subgrupo &gt; ... &gt; conta), como num plano de contas de verdade. Cada conta é <strong>Sintética</strong> (badge "S" — totalizador de grupo/subgrupo, aparece só para organizar, não recebe lançamento) ou <strong>Analítica</strong> (badge "A" — é nela que o Débito/Crédito dos lançamentos é escolhido). A <strong>Natureza</strong> (Débito/Crédito) diz se a conta é devedora ou credora; o <strong>Grupo</strong> diz se ela é Ativo, Passivo, Patrimônio Líquido, Receita, Despesa ou Outras (contas de controle/apuração). Cada conta analítica também pode ter uma referência ao Plano de Contas Referencial da Receita Federal, para ajudar na escrituração da ECD/ECF.</p>
+      <div class="field-row" style="align-items:center; gap:14px; flex-wrap:wrap; margin:0 0 10px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; letter-spacing:0;"><input type="checkbox" id="plano-mostrar-ocultas"> Mostrar contas ocultas</label>
+        <span class="footnote" style="margin:0; text-align:left;">Disponibilidade (seletor ao lado de cada conta): <strong>🔒 Bloqueada</strong> continua no plano mas não pode ser escolhida em lançamentos e vínculos; <strong>🙈 Oculta</strong> também some da lista. Numa conta Sintética vale para todas as contas abaixo dela.</span>
+      </div>
+      <div id="plano-contas-lista"></div>
+      <div class="add-line-grid" style="margin-top:14px;">
+        <div class="field">
+          <label for="plano-conta-pai">Conta pai (Sintética)</label>
+          <select id="plano-conta-pai"></select>
+        </div>
+        <div class="field">
+          <label for="plano-conta-nome">Nome da nova conta</label>
+          <input type="text" id="plano-conta-nome" placeholder="Ex.: Bradesco, Vendas de Pneus...">
+        </div>
+        <div class="field">
+          <label for="plano-conta-tipo">Tipo</label>
+          <select id="plano-conta-tipo">
+            <option value="analitica">Analítica (recebe lançamento)</option>
+            <option value="sintetica">Sintética (totalizador)</option>
+          </select>
+        </div>
+      </div>
+      <p class="footnote" style="margin:4px 0 0; text-align:left;">O código da conta é gerado automaticamente a partir da conta pai escolhida; Natureza e Grupo são herdados da conta pai.</p>
+      <div class="actions" style="justify-content:flex-start; margin-top:4px;">
+        <button type="button" class="secondary" id="btn-plano-conta-add">+ Adicionar conta</button>
+      </div>
+      <div id="plano-contas-toast" style="margin-top:12px;"></div>
+
+      <div class="import-box" id="import-plano-contas-box" style="margin-top:18px;">
+        <div class="import-box-header">
+          <strong>Importar plano de contas de uma planilha (Excel)</strong>
+          <button type="button" class="link-btn" id="btn-baixar-modelo-plano-contas">⬇️ Baixar modelo já preenchido (.xlsx)</button>
+        </div>
+        <p class="footnote" style="text-align:left; margin:4px 0 8px;">O modelo já vem preenchido com o plano de contas padrão "Conta Azul" completo (752 contas, com código, Tipo, Natureza e Grupo) — edite como quiser antes de importar. Uma linha é ignorada na importação se o código ou o nome já existir em uma conta já cadastrada, então você pode reimportar a mesma planilha depois de atualizá-la sem duplicar nada.</p>
+        <div class="field-row" style="align-items:center; flex-wrap:wrap;">
+          <input type="file" id="f-import-plano-contas" accept=".xlsx,.csv">
+          <button type="button" class="secondary" id="btn-importar-plano-contas">Importar planilha</button>
+        </div>
+        <div id="import-plano-contas-toast" style="margin:8px 0 0;"></div>
+        <div id="import-plano-contas-relatorio" hidden></div>
+        <datalist id="rfb-referencial-datalist"></datalist>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;" id="card-rfb-vis">
+      <div class="section-title"><h2>Plano Referencial da Receita — disponibilidade</h2></div>
+      <p class="footnote" style="margin:0 0 10px; text-align:left;">Bloqueie ou oculte as partes do Plano de Contas Referencial que não se aplicam (ex.: atividade rural, S.A., instituições financeiras). <strong>🔒 Bloqueada</strong> aparece riscada na escolha da "Ref. Receita Federal" e não pode ser escolhida; <strong>🙈 Oculta</strong> nem aparece. Num grupo (sintética) vale para tudo abaixo dele.</p>
+      <div class="field-row" style="align-items:center; gap:14px; flex-wrap:wrap; margin:0 0 10px;">
+        <input type="text" id="rfb-vis-busca" placeholder="Buscar por código ou descrição (ex.: rural)..." style="flex:1; min-width:220px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; letter-spacing:0;"><input type="checkbox" id="rfb-vis-analiticas"> Mostrar também as analíticas</label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; text-transform:none; letter-spacing:0;"><input type="checkbox" id="rfb-vis-so-marcadas"> Só bloqueadas/ocultas</label>
+      </div>
+      <div class="rfb-vis-lista" id="rfb-vis-lista"></div>
+      <div id="rfb-vis-toast" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Contas por Tipo de lançamento</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Para cada Tipo de lançamento, escolha se a Conta Débito/Crédito é fixa (sempre a mesma, travada para todos) ou automática. Quando é automática: quem é Faturamento e/ou Contabilidade escolhe as contas manualmente a cada lançamento; quem é só Financeiro e/ou Estoque recebe a conta já vinculada ao fornecedor/cliente e ao banco escolhidos (cadastrada na aba Opções, em cada fornecedor/cliente e em cada banco). "Depósitos não identificados" não tem fornecedor/cliente, então precisa de uma conta fixa para o lado da contrapartida mesmo no modo automático.</p>
+      <div id="regras-contabeis-lista"></div>
+      <div class="actions" style="justify-content:flex-start; margin-top:16px;">
+        <button type="button" class="primary" id="btn-regras-contabeis-save">Salvar contas por tipo</button>
+      </div>
+      <div id="regras-contabeis-toast" style="margin-top:12px;"></div>
+    </div>
+  </section>
+
+  <section id="tab-fechamento" hidden>
+    <div class="card">
+      <div class="section-title"><h2>Fechamento diário</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Depois que um dia é fechado, nenhum lançamento com essa data pode ser incluído ou alterado, exceto por administradores e supervisores. O sistema fecha automaticamente cada dia útil às 10h da manhã do dia útil seguinte; você também pode fechar ou reabrir manualmente aqui.</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="fech-empresa">Empresa</label>
+          <select id="fech-empresa"></select>
+        </div>
+        <div class="field">
+          <label for="fech-data">Data</label>
+          <input type="date" id="fech-data">
+        </div>
+      </div>
+      <div id="fech-dia-status" style="margin-bottom:12px;"></div>
+      <div class="actions" style="justify-content:flex-start;">
+        <button type="button" class="secondary" id="btn-fechar-dia">Fechar dia</button>
+        <button type="button" class="link-btn" id="btn-reabrir-dia">Reabrir dia</button>
+      </div>
+      <div id="fech-dia-toast" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Fechamento mensal</h2></div>
+      <p class="footnote" style="margin:0 0 12px; text-align:left;">Fechar o mês bloqueia de uma vez todos os dias daquele mês para aquela empresa (o fechamento mensal é sempre manual).</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="fech-mes-empresa">Empresa</label>
+          <select id="fech-mes-empresa"></select>
+        </div>
+        <div class="field">
+          <label for="fech-mes">Mês</label>
+          <input type="month" id="fech-mes">
+        </div>
+      </div>
+      <div id="fech-mes-status" style="margin-bottom:12px;"></div>
+      <div class="actions" style="justify-content:flex-start;">
+        <button type="button" class="secondary" id="btn-fechar-mes">Fechar mês</button>
+        <button type="button" class="link-btn" id="btn-reabrir-mes">Reabrir mês</button>
+      </div>
+      <div id="fech-mes-toast" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Histórico de fechamentos</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-fechamentos">
+          <thead><tr><th>Empresa</th><th>Período</th><th>Tipo</th><th>Status</th><th>Por</th><th>Quando</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-usuarios" hidden>
+    <div class="card">
+      <div class="section-title"><h2>Novo usuário</h2></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="u-usuario">Usuário</label>
+          <input type="text" id="u-usuario" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="u-senha">Senha</label>
+          <div class="pw-wrap">
+            <input type="password" id="u-senha" autocomplete="new-password">
+            <button type="button" class="pw-toggle" data-target="u-senha" tabindex="-1">Mostrar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="u-papel">Papel</label>
+          <select id="u-papel"></select>
+        </div>
+        <div class="field">
+          <label for="u-email">E-mail <span class="hint">(opcional, só para referência)</span></label>
+          <input type="email" id="u-email" autocomplete="off">
+        </div>
+      </div>
+      <div class="field" id="u-area-wrap" style="flex:none; max-width:340px; margin-bottom:16px;">
+        <label>Área <span class="hint">(obrigatório — marque uma ou mais)</span></label>
+        <div class="check-list" id="u-area-list"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px; flex:none;">
+        <label style="text-transform:none; font-weight:600; font-size:13.5px; flex-direction:row; align-items:center; display:flex; gap:8px;"><input type="checkbox" id="u-todas-empresas"> Acesso a todas as empresas</label>
+      </div>
+      <div class="field" id="u-empresas-wrap" style="flex:none; max-width:340px;">
+        <label>Empresas permitidas</label>
+        <div class="check-list" id="u-empresas-list"></div>
+      </div>
+      <div class="actions" style="justify-content:flex-start;">
+        <button type="button" class="primary" id="btn-user-save">Criar usuário</button>
+      </div>
+      <div id="user-toast" style="margin-top:12px;"></div>
+      <div class="key-box" id="user-keyreveal-box" hidden style="margin-top:12px;"></div>
+      <p class="footnote" style="margin-top:12px; text-align:left;">Apenas administradores e supervisores acessam a aba Preencher. Colaboradores entram e visualizam Resumo e Saldos, sem poder lançar ou editar. Todo usuário precisa ter ao menos uma Área (Financeiro, Faturamento e/ou Estoque); além de identificar o setor, a Área agora também determina, para colaboradores, quais Tipos de lançamento, Centros de Custo e Bancos aparecem nos campos (configurável na aba Opções, em "Bloqueios por área") — quando o usuário tem mais de uma área, ele vê a soma do que cada uma libera. Administradores e supervisores continuam vendo tudo normalmente, independente da área marcada. As senhas ficam salvas nesta base de dados compartilhada do sistema — use senhas específicas para esta ferramenta, não reaproveite senhas importantes.</p>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Redefinir senha de um usuário</h2></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="rp-usuario">Usuário</label>
+          <select id="rp-usuario"></select>
+        </div>
+        <div class="field">
+          <label for="rp-senha">Nova senha</label>
+          <div class="pw-wrap">
+            <input type="password" id="rp-senha" autocomplete="new-password">
+            <button type="button" class="pw-toggle" data-target="rp-senha" tabindex="-1">Mostrar</button>
+          </div>
+        </div>
+      </div>
+      <div class="actions" style="justify-content:flex-start;">
+        <button type="button" class="secondary" id="btn-reset-senha">Salvar nova senha</button>
+      </div>
+      <div id="reset-senha-toast" style="margin-top:12px;"></div>
+      <p class="footnote" style="margin-top:12px; text-align:left;">Use isto quando um usuário esquecer a senha e não tiver (ou tiver perdido) a chave de recuperação.</p>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="section-title"><h2>Usuários cadastrados</h2></div>
+      <div class="table-scroll">
+        <table id="tbl-usuarios"><thead><tr><th>Usuário</th><th>E-mail</th><th>Papel</th><th>Área</th><th>Empresas</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+</div>
+
+
+<script src="/vendor/xlsx.full.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
