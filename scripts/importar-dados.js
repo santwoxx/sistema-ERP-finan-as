@@ -16,6 +16,11 @@ const ORIGEM = path.resolve(process.argv.find((a) => a.startsWith("--origem="))?
 const PASTA_DADOS = path.resolve(process.env.PASTA_DADOS || path.join(__dirname, "..", "data"));
 const FORCAR = process.argv.includes("--forcar");
 
+if (!fs.existsSync(ORIGEM)) {
+  console.log(`[import] Pasta '${ORIGEM}' não existe. Nenhuma importação inicial realizada.`);
+  process.exit(0);
+}
+
 const store = new Store(PASTA_DADOS);
 if (store.total() > 0 && !FORCAR) {
   console.log(`O banco já tem ${store.total()} documentos. Nada foi importado.\nUse "npm run importar -- --forcar" para gravar por cima.`);
